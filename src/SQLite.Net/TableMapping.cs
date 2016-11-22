@@ -32,8 +32,8 @@ namespace SQLite.Net
 {
     public class TableMapping
     {
-        private readonly Column _autoPk;
-        private Column[] _insertColumns;
+        private readonly IColumn _autoPk;
+        private IColumn[] _insertColumns;
 
         [PublicAPI]
         public TableMapping(Type type, IEnumerable<PropertyInfo> properties, CreateFlags createFlags = CreateFlags.None)
@@ -46,7 +46,7 @@ namespace SQLite.Net
 
             var props = properties;
 
-            var cols = new List<Column>();
+            var cols = new List<IColumn>();
             foreach (var p in props)
             {
                 var ignore = p.IsDefined(typeof (IgnoreAttribute), true);
@@ -89,10 +89,10 @@ namespace SQLite.Net
         public string TableName { get; private set; }
 
         [PublicAPI]
-        public Column[] Columns { get; private set; }
+        public IColumn[] Columns { get; private set; }
 
         [PublicAPI]
-        public Column PK { get; private set; }
+        public IColumn PK { get; private set; }
 
         [PublicAPI]
         public string GetByPrimaryKeySql { get; private set; }
@@ -101,7 +101,7 @@ namespace SQLite.Net
         public bool HasAutoIncPK { get; private set; }
 
         [PublicAPI]
-        public Column[] InsertColumns
+        public IColumn[] InsertColumns
         {
             get { return _insertColumns ?? (_insertColumns = Columns.Where(c => !c.IsAutoInc).ToArray()); }
         }
@@ -116,20 +116,38 @@ namespace SQLite.Net
         }
 
         [PublicAPI]
-        public Column FindColumnWithPropertyName(string propertyName)
+        public IColumn FindColumnWithPropertyName(string propertyName)
         {
             var exact = Columns.FirstOrDefault(c => c.PropertyName == propertyName);
             return exact;
         }
 
         [PublicAPI]
-        public Column FindColumn(string columnName)
+        public IColumn FindColumn(string columnName)
         {
             var exact = Columns.FirstOrDefault(c => c.Name == columnName);
             return exact;
         }
 
-        public class Column
+        public interface IColumn
+        {
+            string Collation { get; }
+            Type ColumnType { get; }
+            object DefaultValue { get; }
+            IEnumerable<IndexedAttribute> Indices { get; set; }
+            bool IsAutoGuid { get; }
+            bool IsAutoInc { get; }
+            bool IsNullable { get; }
+            bool IsPK { get; }
+            int? MaxStringLength { get; }
+            string Name { get; }
+            string PropertyName { get; }
+
+            object GetValue(object obj);
+            void SetValue(object obj, [CanBeNull] object val);
+        }
+
+        public class Column : IColumn
         {
             private readonly PropertyInfo _prop;
 

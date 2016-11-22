@@ -80,7 +80,7 @@ namespace SQLite.Net.Tests
             db.CreateTable<NoAttributes>(CreateFlags.ImplicitIndex);
 
             TableMapping mapping = db.GetMapping<NoAttributes>();
-            TableMapping.Column column = mapping.Columns[2];
+            TableMapping.IColumn column = mapping.Columns[2];
             Assert.AreEqual("IndexedId", column.Name);
             Assert.IsTrue(column.Indices.Any());
         }
@@ -158,7 +158,7 @@ namespace SQLite.Net.Tests
 
             Assert.IsNull(mapping.PK);
 
-            TableMapping.Column column = mapping.Columns[2];
+            TableMapping.IColumn column = mapping.Columns[2];
             Assert.AreEqual("IndexedId", column.Name);
             Assert.IsFalse(column.Indices.Any());
 

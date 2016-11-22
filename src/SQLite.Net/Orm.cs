@@ -36,7 +36,7 @@ namespace SQLite.Net
         public const string ImplicitPkName = "Id";
         public const string ImplicitIndexSuffix = "Id";
 
-        internal static string SqlDecl(TableMapping.Column p, bool storeDateTimeAsTicks, IBlobSerializer serializer,
+        internal static string SqlDecl(TableMapping.IColumn p, bool storeDateTimeAsTicks, IBlobSerializer serializer,
             IDictionary<Type, string> extraTypeMappings)
         {
             var decl = "\"" + p.Name + "\" " + SqlType(p, storeDateTimeAsTicks, serializer, extraTypeMappings) + " ";
@@ -65,7 +65,7 @@ namespace SQLite.Net
             return decl;
         }
 
-        private static string SqlType(TableMapping.Column p, bool storeDateTimeAsTicks,
+        private static string SqlType(TableMapping.IColumn p, bool storeDateTimeAsTicks,
             IBlobSerializer serializer,
             IDictionary<Type, string> extraTypeMappings)
         {

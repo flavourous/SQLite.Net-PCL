@@ -42,7 +42,7 @@ namespace SQLite.Net
         }
 
         [PublicAPI]
-        public IEnumerable<TableMapping.Column> Columns { get; protected set; }
+        public IEnumerable<TableMapping.IColumn> Columns { get; protected set; }
 
         internal new static NotNullConstraintViolationException New(Result r, string message)
         {

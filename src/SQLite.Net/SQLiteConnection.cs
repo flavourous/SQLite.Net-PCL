@@ -565,7 +565,7 @@ namespace SQLite.Net
         {
             var existingCols = GetTableInfo(map.TableName);
 
-            var toBeAdded = new List<TableMapping.Column>();
+            var toBeAdded = new List<TableMapping.IColumn>();
 
             foreach (var p in map.Columns)
             {
