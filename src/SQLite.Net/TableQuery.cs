@@ -333,7 +333,7 @@ namespace SQLite.Net
             return Connection.CreateCommand(cmdText, args.ToArray());
         }
 
-        private CompileResult CompileExpr([NotNull] Expression expr, List<object> queryArgs)
+        public CompileResult CompileExpr([NotNull] Expression expr, List<object> queryArgs)
         {
             if (expr == null)
             {
@@ -383,17 +383,25 @@ namespace SQLite.Net
             if (expr.NodeType == ExpressionType.Call)
             {
                 var call = (MethodCallExpression) expr;
-                var args = new CompileResult[call.Arguments.Count];
-                var obj = call.Object != null ? CompileExpr(call.Object, queryArgs) : null;
 
+                var ca = _sqlitePlatform.ReflectionService.GetCustomAttributes(call.Object);
+                bool is_col_access = ca.Any(a => a.GetType() == typeof(Attributes.ColumnAccessorAttribute));
+
+                var obj = call.Object != null && !is_col_access ? CompileExpr(call.Object, queryArgs) : null;
+
+                var args = new CompileResult[call.Arguments.Count];
                 for (var i = 0; i < args.Length; i++)
                 {
                     args[i] = CompileExpr(call.Arguments[i], queryArgs);
                 }
 
                 var sqlCall = "";
-
-                if (call.Method.Name == "Like" && args.Length == 2)
+                if (is_col_access)
+                {
+                    sqlCall = args[0].Value.ToString();
+                    queryArgs.RemoveAt(queryArgs.Count - 1);
+                }
+                else if (call.Method.Name == "Like" && args.Length == 2)
                 {
                     sqlCall = "(" + args[0].CommandText + " like " + args[1].CommandText + ")";
                 }
@@ -656,7 +664,7 @@ namespace SQLite.Net
             return query.ToList().FirstOrDefault();
         }
 
-        private class CompileResult
+        public class CompileResult
         {
             public string CommandText { get; set; }
 

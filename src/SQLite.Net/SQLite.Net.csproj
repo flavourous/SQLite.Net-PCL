@@ -67,6 +67,7 @@
     </Compile>
     <Compile Include="ActiveInsertCommand.cs" />
     <Compile Include="Annotations\JetBrains.cs" />
+    <Compile Include="Attributes\ColumnAccessorAttribute.cs" />
     <Compile Include="Attributes\DefaultAttribute.cs" />
     <Compile Include="Attributes\NotNullAttribute.cs" />
     <Compile Include="BaseTableQuery.cs" />
