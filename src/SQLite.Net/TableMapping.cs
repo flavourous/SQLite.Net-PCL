@@ -81,6 +81,38 @@ namespace SQLite.Net
                 GetByPrimaryKeySql = string.Format("select * from \"{0}\" limit 1", TableName);
             }
         }
+        /// <summary>
+        /// Cloning constructor.
+        /// Warning, doesn't clone the Columns property.
+        /// </summary>
+        /// <param name="toClone"></param>
+        private TableMapping(TableMapping toClone)
+        {
+            MappedType = toClone.MappedType;
+            TableName = toClone.TableName;
+            _autoPk = toClone._autoPk;
+            HasAutoIncPK = _autoPk != null;
+            GetByPrimaryKeySql = toClone.GetByPrimaryKeySql;
+        }
+
+        /// <summary>
+        /// Returns a copy of the mapping, with a new table name and some ad-hoc columns.  The
+        /// </summary>
+        /// <param name="tableName"></param>
+        /// <param name="unmappedColumns"></param>
+        /// <returns></returns>
+        [PublicAPI]
+        public TableMapping WithMutatedSchema(String tableName, IEnumerable<AdHocColumn> unmappedColumns)
+        {
+            if (unmappedColumns.Any(c => !c.ColumnType.GetTypeInfo().IsAssignableFrom(MappedType.GetTypeInfo())))
+                throw new ArgumentException("An `unmappedColumn` does not match the type of this mapping.");
+
+            return new TableMapping(this)
+            {
+                TableName = tableName,
+                Columns = this.Columns.Concat(unmappedColumns).ToArray()
+            };
+        }
 
         [PublicAPI]
         public Type MappedType { get; private set; }
@@ -118,7 +150,7 @@ namespace SQLite.Net
         [PublicAPI]
         public IColumn FindColumnWithPropertyName(string propertyName)
         {
-            var exact = Columns.FirstOrDefault(c => c.PropertyName == propertyName);
+            var exact = Columns.FirstOrDefault(c => !(c is AdHocColumn) && c.PropertyName == propertyName);
             return exact;
         }
 
@@ -149,9 +181,17 @@ namespace SQLite.Net
 
         public class AdHocColumn : IColumn
         {
-            public AdHocColumn(String name, Type type, Object defaultValue = null)
+            readonly PropertyInfo holder;
+            public AdHocColumn(String name, Type modelType, PropertyInfo holder, Object defaultValue = null)
             {
-                ColumnType = type;
+                if (!holder.PropertyType.GetTypeInfo().IsAssignableFrom(typeof(IDictionary<String, Object>).GetTypeInfo()))
+                    throw new ArgumentException("`holder` is expected to refer to a `IDictionary<String,Object>`");
+                if (!holder.DeclaringType.GetTypeInfo().IsAssignableFrom(modelType.GetTypeInfo()))
+                    throw new ArgumentException("`holder` is expected to refer to a property of `modelType`");
+
+                this.holder = holder;
+
+                ColumnType = modelType;
                 Name = name;
 
                 Collation = String.Empty;
@@ -177,10 +217,20 @@ namespace SQLite.Net
             public bool IsPK { get; set; }
             public int? MaxStringLength { get; set; }
             public string Name { get; set; }
-            public string PropertyName { get; set; }
 
-            public object GetValue(object obj) { throw new NotImplementedException(); }
-            public void SetValue(object obj, [CanBeNull] object val) { throw new NotImplementedException(); }
+            public object GetValue(object obj)
+            {
+                var iholder = (IDictionary<string, object>)holder.GetValue(obj);
+                return iholder[Name];
+            }
+            public void SetValue(object obj, [CanBeNull] object val)
+            {
+                var iholder = (IDictionary<string, object>)holder.GetValue(obj);
+                iholder[Name] = val;
+            }
+
+            // Should not be used.  This will break some sqlite.net features for these column types in the meantime.
+            public string PropertyName { get { throw new NotImplementedException(); } }
         }
 
         public class Column : IColumn
