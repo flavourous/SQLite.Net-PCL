@@ -147,6 +147,42 @@ namespace SQLite.Net
             void SetValue(object obj, [CanBeNull] object val);
         }
 
+        public class AdHocColumn : IColumn
+        {
+            public AdHocColumn(String name, Type type, Object defaultValue = null)
+            {
+                ColumnType = type;
+                Name = name;
+
+                Collation = String.Empty;
+
+                IsPK = false;
+                IsAutoGuid = false;
+                IsAutoInc = false;
+
+                DefaultValue = defaultValue;
+
+                Indices = Enumerable.Empty<IndexedAttribute>();
+                IsNullable = true;
+                MaxStringLength = null;
+            }
+
+            public string Collation { get; set; }
+            public Type ColumnType { get; set; }
+            public object DefaultValue { get; set; }
+            public IEnumerable<IndexedAttribute> Indices { get; set; }
+            public bool IsAutoGuid { get; set; }
+            public bool IsAutoInc { get; set; }
+            public bool IsNullable { get; set; }
+            public bool IsPK { get; set; }
+            public int? MaxStringLength { get; set; }
+            public string Name { get; set; }
+            public string PropertyName { get; set; }
+
+            public object GetValue(object obj) { throw new NotImplementedException(); }
+            public void SetValue(object obj, [CanBeNull] object val) { throw new NotImplementedException(); }
+        }
+
         public class Column : IColumn
         {
             private readonly PropertyInfo _prop;
