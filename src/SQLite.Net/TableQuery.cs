@@ -29,6 +29,7 @@ using System.Linq.Expressions;
 using System.Text;
 using JetBrains.Annotations;
 using SQLite.Net.Interop;
+using System.Reflection;
 
 namespace SQLite.Net
 {
@@ -384,7 +385,8 @@ namespace SQLite.Net
             {
                 var call = (MethodCallExpression) expr;
 
-                var ca = _sqlitePlatform.ReflectionService.GetCustomAttributes(call.Object);
+                var ca = call.Object.Type.GetTypeInfo().GetCustomAttributes();
+
                 bool is_col_access = ca.Any(a => a.GetType() == typeof(Attributes.ColumnAccessorAttribute));
 
                 var obj = call.Object != null && !is_col_access ? CompileExpr(call.Object, queryArgs) : null;

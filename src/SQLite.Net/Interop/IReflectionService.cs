@@ -32,6 +32,5 @@ namespace SQLite.Net.Interop
     {
         IEnumerable<PropertyInfo> GetPublicInstanceProperties(Type mappedType);
         object GetMemberValue(object obj, Expression expr, MemberInfo member);
-        IEnumerable<Attribute> GetCustomAttributes(Expression obj);
     }
 }

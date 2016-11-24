@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 using SQLite.Net.Interop;
-using System.Linq;
 
 namespace SQLite.Net.Platform.XamarinAndroid
 {
@@ -12,13 +11,6 @@ namespace SQLite.Net.Platform.XamarinAndroid
         public IEnumerable<PropertyInfo> GetPublicInstanceProperties(Type mappedType)
         {
             return mappedType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty);
-        }
-
-        IEnumerable<Attribute> IReflectionService.GetCustomAttributes(Expression obj)
-        {
-            var me = obj as MemberExpression;
-            if (me == null) return Enumerable.Empty<Attribute>();
-            return me.Member.GetCustomAttributes().Cast<Attribute>();
         }
 
         public object GetMemberValue(object obj, Expression expr, MemberInfo member)
