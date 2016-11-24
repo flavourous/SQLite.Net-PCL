@@ -33,7 +33,7 @@ namespace SQLite.Net
     public class TableMapping
     {
         private readonly IColumn _autoPk;
-        private IColumn[] _insertColumns;
+        private IColumn[] _insertColumns, _originalColumns;
 
         [PublicAPI]
         public TableMapping(Type type, IEnumerable<PropertyInfo> properties, CreateFlags createFlags = CreateFlags.None)
@@ -56,7 +56,7 @@ namespace SQLite.Net
                     cols.Add(new Column(p, createFlags));
                 }
             }
-            Columns = cols.ToArray();
+            _originalColumns = Columns = cols.ToArray();
             foreach (var c in Columns)
             {
                 if (c.IsAutoInc && c.IsPK)
@@ -91,6 +91,7 @@ namespace SQLite.Net
             MappedType = toClone.MappedType;
             TableName = toClone.TableName;
             _autoPk = toClone._autoPk;
+            _originalColumns = toClone._originalColumns; // byref is ok
             HasAutoIncPK = _autoPk != null;
             GetByPrimaryKeySql = toClone.GetByPrimaryKeySql;
         }
@@ -104,13 +105,13 @@ namespace SQLite.Net
         [PublicAPI]
         public TableMapping WithMutatedSchema(String tableName, IEnumerable<AdHocColumn> unmappedColumns)
         {
-            if (unmappedColumns.Any(c => !c.ColumnType.GetTypeInfo().IsAssignableFrom(MappedType.GetTypeInfo())))
+            if (unmappedColumns.Any(c => !c.Holder.DeclaringType.GetTypeInfo().IsAssignableFrom(MappedType.GetTypeInfo())))
                 throw new ArgumentException("An `unmappedColumn` does not match the type of this mapping.");
 
             return new TableMapping(this)
             {
                 TableName = tableName,
-                Columns = this.Columns.Concat(unmappedColumns).ToArray()
+                Columns = _originalColumns.Concat(unmappedColumns).ToArray()
             };
         }
 
@@ -181,17 +182,15 @@ namespace SQLite.Net
 
         public class AdHocColumn : IColumn
         {
-            readonly PropertyInfo holder;
-            public AdHocColumn(String name, Type modelType, PropertyInfo holder, Object defaultValue = null)
+            public readonly PropertyInfo Holder;
+            public AdHocColumn(String name, Type columnType, PropertyInfo holder, Object defaultValue = null)
             {
                 if (!holder.PropertyType.GetTypeInfo().IsAssignableFrom(typeof(IDictionary<String, Object>).GetTypeInfo()))
                     throw new ArgumentException("`holder` is expected to refer to a `IDictionary<String,Object>`");
-                if (!holder.DeclaringType.GetTypeInfo().IsAssignableFrom(modelType.GetTypeInfo()))
-                    throw new ArgumentException("`holder` is expected to refer to a property of `modelType`");
 
-                this.holder = holder;
+                this.Holder = holder;
 
-                ColumnType = modelType;
+                ColumnType = columnType;
                 Name = name;
 
                 Collation = String.Empty;
@@ -220,12 +219,13 @@ namespace SQLite.Net
 
             public object GetValue(object obj)
             {
-                var iholder = (IDictionary<string, object>)holder.GetValue(obj);
+                var iholder = (IDictionary<string, object>)Holder.GetValue(obj);
+                if (!iholder.Keys.Contains(Name)) iholder[Name] = DefaultValue;
                 return iholder[Name];
             }
             public void SetValue(object obj, [CanBeNull] object val)
             {
-                var iholder = (IDictionary<string, object>)holder.GetValue(obj);
+                var iholder = (IDictionary<string, object>)Holder.GetValue(obj);
                 iholder[Name] = val;
             }
 

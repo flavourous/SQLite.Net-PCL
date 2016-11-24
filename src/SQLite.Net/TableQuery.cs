@@ -46,7 +46,7 @@ namespace SQLite.Net
         private List<Ordering> _orderBys;
         private Expression _where;
 
-        private TableQuery(ISQLitePlatform platformImplementation, SQLiteConnection conn, TableMapping table)
+        public TableQuery(ISQLitePlatform platformImplementation, SQLiteConnection conn, TableMapping table)
         {
             _sqlitePlatform = platformImplementation;
             Connection = conn;
@@ -72,10 +72,10 @@ namespace SQLite.Net
         {
             if (!_deferred)
             {
-                return GenerateCommand("*").ExecuteQuery<T>().GetEnumerator();
+                return GenerateCommand("*").ExecuteQuery<T>(Table).GetEnumerator();
             }
 
-            return GenerateCommand("*").ExecuteDeferredQuery<T>().GetEnumerator();
+            return GenerateCommand("*").ExecuteDeferredQuery<T>(Table).GetEnumerator();
         }
 
         [PublicAPI]

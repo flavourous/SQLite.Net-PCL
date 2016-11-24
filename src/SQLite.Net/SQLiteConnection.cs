@@ -345,7 +345,11 @@ namespace SQLite.Net
         public int DropTable(Type t)
         {
             var map = GetMapping(t);
-
+            return DropTable(map);
+        }
+            [PublicAPI]
+        public int DropTable(TableMapping map)
+        {
             var query = string.Format("drop table if exists \"{0}\"", map.TableName);
 
             return Execute(query);
@@ -821,6 +825,17 @@ namespace SQLite.Net
         }
 
         /// <summary>
+        /// With map
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        [PublicAPI]
+        public TableQuery<T> Table<T>(TableMapping map) where T : class
+        {
+            return new TableQuery<T>(Platform, this, map);
+        }
+
+        /// <summary>
         ///     Attempts to retrieve an object with the given primary key from the table
         ///     associated with the specified type. Use of this method requires that
         ///     the given type have a designated PrimaryKey (using the PrimaryKeyAttribute).
@@ -854,6 +869,12 @@ namespace SQLite.Net
         public T Get<T>(Expression<Func<T, bool>> predicate) where T : class
         {
             return Table<T>().Where(predicate).First();
+        }
+
+        [PublicAPI]
+        public T Get<T>(Expression<Func<T, bool>> predicate, TableMapping map) where T : class
+        { 
+            return Table<T>(map).Where(predicate).First();
         }
 
         /// <summary>
@@ -1261,6 +1282,12 @@ namespace SQLite.Net
         [PublicAPI]
         public int InsertAll(IEnumerable objects, Type objType, bool runInTransaction = true)
         {
+            var map = GetMapping(objType);
+            return InsertAll(objects, map, runInTransaction);
+        }
+        [PublicAPI]
+        public int InsertAll(IEnumerable objects, TableMapping map, bool runInTransaction = true)
+        {
             var c = 0;
             if (runInTransaction)
             {
@@ -1268,7 +1295,7 @@ namespace SQLite.Net
                 {
                     foreach (var r in objects)
                     {
-                        c += Insert(r, objType);
+                        c += Insert(r, map);
                     }
                 });
             }
@@ -1276,7 +1303,7 @@ namespace SQLite.Net
             {
                 foreach (var r in objects)
                 {
-                    c += Insert(r, objType);
+                    c += Insert(r, map);
                 }
             }
             return c;
@@ -1301,6 +1328,12 @@ namespace SQLite.Net
         public int InsertOrIgnore (object obj, Type objType)
         {
             return Insert (obj, "OR IGNORE", objType);
+        }
+
+        [PublicAPI]
+        public int InsertOrIgnore(object obj, TableMapping map)
+        {
+            return Insert(obj, "OR IGNORE", map);
         }
 
         /// <summary>
@@ -1414,6 +1447,12 @@ namespace SQLite.Net
             return Insert(obj, "OR REPLACE", objType);
         }
 
+        [PublicAPI]
+        public int InsertOrReplace(object obj, TableMapping map)
+        {
+            return Insert(obj, "OR REPLACE", map);
+        }
+
         /// <summary>
         ///     Inserts all specified objects.
         ///     For each insertion, if a UNIQUE
@@ -1493,9 +1532,21 @@ namespace SQLite.Net
 
             var map = GetMapping(objType);
 
+            return Insert(obj, extra, map);
+        }
+
+        [PublicAPI]
+        public int Insert(object obj, TableMapping map)
+        {
+            return Insert(obj, "", map);
+        }
+
+        [PublicAPI]
+        public int Insert(object obj, String extra, TableMapping map)
+        { 
             if (map.PK != null && map.PK.IsAutoGuid)
             {
-                var prop = objType.GetRuntimeProperty(map.PK.PropertyName);
+                var prop = map.MappedType.GetRuntimeProperty(map.PK.PropertyName);
                 if (prop != null)
                 {
                     if (prop.GetValue(obj, null).Equals(Guid.Empty))
@@ -1593,7 +1644,6 @@ namespace SQLite.Net
         [PublicAPI]
         public int Update(object obj, Type objType)
         {
-            int rowsAffected;
             if (obj == null || objType == null)
             {
                 return 0;
@@ -1601,6 +1651,24 @@ namespace SQLite.Net
 
             var map = GetMapping(objType);
 
+            return _Update(obj, map);
+        }
+
+        [PublicAPI]
+        public int Update(object obj, TableMapping map)
+        {
+            if (obj == null || map == null)
+            {
+                return 0;
+            }
+
+            return _Update(obj, map);
+        }
+
+
+        int _Update(object obj, TableMapping map)
+        { 
+            int rowsAffected;
             var pk = map.PK;
 
             if (pk == null)
@@ -1684,6 +1752,12 @@ namespace SQLite.Net
         public int Delete(object objectToDelete)
         {
             var map = GetMapping(objectToDelete.GetType());
+            return Delete(objectToDelete, map);
+        }
+
+        [PublicAPI]
+        public int Delete(object objectToDelete, TableMapping map)
+        {
             var pk = map.PK;
             if (pk == null)
             {
@@ -1750,6 +1824,12 @@ namespace SQLite.Net
         public int DeleteAll(Type t)
         {
             var map = GetMapping(t);
+            return DeleteAll(map);
+        }
+
+        [PublicAPI]
+        public int DeleteAll(TableMapping map)
+        { 
             var query = string.Format("delete from \"{0}\"", map.TableName);
             return Execute(query);
         }
