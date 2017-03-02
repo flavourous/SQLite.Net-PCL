@@ -26,11 +26,13 @@ using JetBrains.Annotations;
 namespace SQLite.Net.Attributes
 {
     /// <summary>
-    /// Mark a IDictionary<String,Object\> to hold unmapped columns of the underlying mapped table.
+    /// Mark a indexer like `Object this[String key]` to hold unmapped columns of the underlying mapped table.
     /// </summary>
     [PublicAPI]
     [AttributeUsage(AttributeTargets.Property)]
-    public class ColumnAccessorAttribute : Attribute
+    public class ColumnAccessorAttribute : IgnoreAttribute
     {
     }
+
+
 }

@@ -384,11 +384,7 @@ namespace SQLite.Net
             if (expr.NodeType == ExpressionType.Call)
             {
                 var call = (MethodCallExpression) expr;
-
-                var ca = call.Object.Type.GetTypeInfo().GetCustomAttributes();
-
-                bool is_col_access = ca.Any(a => a.GetType() == typeof(Attributes.ColumnAccessorAttribute));
-
+                var is_col_access = call.Method == Table.ColumnAccessor?.GetMethod;
                 var obj = call.Object != null && !is_col_access ? CompileExpr(call.Object, queryArgs) : null;
 
                 var args = new CompileResult[call.Arguments.Count];

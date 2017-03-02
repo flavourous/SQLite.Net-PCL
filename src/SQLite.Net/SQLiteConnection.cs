@@ -311,7 +311,7 @@ namespace SQLite.Net
         private TableMapping CreateAndSetMapping(Type type, CreateFlags createFlags, IDictionary<string, TableMapping> mapTable)
         {
             var props = Platform.ReflectionService.GetPublicInstanceProperties(type);
-            var map = new TableMapping(type, props, createFlags);
+            var map = new TableMapping(type, props, null, createFlags);
 	            mapTable[type.FullName] = map;
             	return map;
         }
@@ -569,7 +569,7 @@ namespace SQLite.Net
         {
             var existingCols = GetTableInfo(map.TableName);
 
-            var toBeAdded = new List<TableMapping.IColumn>();
+            var toBeAdded = new List<TableMapping.Column>();
 
             foreach (var p in map.Columns)
             {
@@ -1545,16 +1545,7 @@ namespace SQLite.Net
         public int Insert(object obj, String extra, TableMapping map)
         { 
             if (map.PK != null && map.PK.IsAutoGuid)
-            {
-                var prop = map.MappedType.GetRuntimeProperty(map.PK.PropertyName);
-                if (prop != null)
-                {
-                    if (prop.GetValue(obj, null).Equals(Guid.Empty))
-                    {
-                        prop.SetValue(obj, Guid.NewGuid(), null);
-                    }
-                }
-            }
+                map.PK.SetValue(obj, Guid.NewGuid());
 
             var replacing = string.Compare(extra, "OR REPLACE", StringComparison.OrdinalIgnoreCase) == 0;
 

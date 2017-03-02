@@ -32,30 +32,32 @@ namespace SQLite.Net
 {
     public class TableMapping
     {
-        private readonly IColumn _autoPk;
-        private IColumn[] _insertColumns, _originalColumns;
-
+        private readonly Column _autoPk;
+        private Column[] _insertColumns, _originalColumns;
         [PublicAPI]
-        public TableMapping(Type type, IEnumerable<PropertyInfo> properties, CreateFlags createFlags = CreateFlags.None)
+        public TableMapping(Type type, IEnumerable<PropertyInfo> properties, String TableName = null, CreateFlags createFlags = CreateFlags.None)
+            :this(type, properties.Select(d=>new Column.TypeInfoPropAdapter(d)), TableName, createFlags)
+        {
+        }
+        [PublicAPI]
+        public TableMapping(Type type, IEnumerable<ITypeInfo> properties, String TableName = null, CreateFlags createFlags = CreateFlags.None)
         {
             MappedType = type;
 
+            var cas = properties.Where(d => d.GetCustomAttributes<ColumnAccessorAttribute>(false).Count()>0);
+            if (cas.Count() > 0) ColumnAccessor = cas.First();
+
             var tableAttr = type.GetTypeInfo().GetCustomAttributes<TableAttribute>().FirstOrDefault();
 
-            TableName = tableAttr != null ?  tableAttr.Name : MappedType.Name;
+            this.TableName = TableName ?? (tableAttr != null ? tableAttr.Name : MappedType.Name);
 
             var props = properties;
 
-            var cols = new List<IColumn>();
+            var cols = new List<Column>();
             foreach (var p in props)
-            {
-                var ignore = p.IsDefined(typeof (IgnoreAttribute), true);
-
-                if (p.CanWrite && !ignore)
-                {
+                if(!p.IsDefined<IgnoreAttribute>(true))
                     cols.Add(new Column(p, createFlags));
-                }
-            }
+
             _originalColumns = Columns = cols.ToArray();
             foreach (var c in Columns)
             {
@@ -70,50 +72,27 @@ namespace SQLite.Net
             }
 
             HasAutoIncPK = _autoPk != null;
+            GetByPrimaryKeySql = GeneratePKSQL(PK, this.TableName);
+            
+        }
 
+        static String GeneratePKSQL(Column PK, String TableName)
+        {
             if (PK != null)
             {
-                GetByPrimaryKeySql = string.Format("select * from \"{0}\" where \"{1}\" = ?", TableName, PK.Name);
+                return string.Format("select * from \"{0}\" where \"{1}\" = ?", TableName, PK.Name);
             }
             else
             {
                 // People should not be calling Get/Find without a PK
-                GetByPrimaryKeySql = string.Format("select * from \"{0}\" limit 1", TableName);
+                return string.Format("select * from \"{0}\" limit 1", TableName);
             }
         }
-        /// <summary>
-        /// Cloning constructor.
-        /// Warning, doesn't clone the Columns property.
-        /// </summary>
-        /// <param name="toClone"></param>
-        private TableMapping(TableMapping toClone)
-        {
-            MappedType = toClone.MappedType;
-            TableName = toClone.TableName;
-            _autoPk = toClone._autoPk;
-            _originalColumns = toClone._originalColumns; // byref is ok
-            HasAutoIncPK = _autoPk != null;
-            GetByPrimaryKeySql = toClone.GetByPrimaryKeySql;
-        }
 
-        /// <summary>
-        /// Returns a copy of the mapping, with a new table name and some ad-hoc columns.  The
-        /// </summary>
-        /// <param name="tableName"></param>
-        /// <param name="unmappedColumns"></param>
-        /// <returns></returns>
-        [PublicAPI]
-        public TableMapping WithMutatedSchema(String tableName, IEnumerable<AdHocColumn> unmappedColumns)
-        {
-            if (unmappedColumns.Any(c => !c.Holder.DeclaringType.GetTypeInfo().IsAssignableFrom(MappedType.GetTypeInfo())))
-                throw new ArgumentException("An `unmappedColumn` does not match the type of this mapping.");
+        private TableMapping(Column autopk) { this._autoPk = autopk; }
 
-            return new TableMapping(this)
-            {
-                TableName = tableName,
-                Columns = _originalColumns.Concat(unmappedColumns).ToArray()
-            };
-        }
+        
+        public ITypeInfo ColumnAccessor { get; private set; }
 
         [PublicAPI]
         public Type MappedType { get; private set; }
@@ -122,10 +101,10 @@ namespace SQLite.Net
         public string TableName { get; private set; }
 
         [PublicAPI]
-        public IColumn[] Columns { get; private set; }
+        public Column[] Columns { get; private set; }
 
         [PublicAPI]
-        public IColumn PK { get; private set; }
+        public Column PK { get; private set; }
 
         [PublicAPI]
         public string GetByPrimaryKeySql { get; private set; }
@@ -134,7 +113,7 @@ namespace SQLite.Net
         public bool HasAutoIncPK { get; private set; }
 
         [PublicAPI]
-        public IColumn[] InsertColumns
+        public Column[] InsertColumns
         {
             get { return _insertColumns ?? (_insertColumns = Columns.Where(c => !c.IsAutoInc).ToArray()); }
         }
@@ -149,127 +128,92 @@ namespace SQLite.Net
         }
 
         [PublicAPI]
-        public IColumn FindColumnWithPropertyName(string propertyName)
+        public Column FindColumnWithPropertyName(string propertyName)
         {
-            var exact = Columns.FirstOrDefault(c => !(c is AdHocColumn) && c.PropertyName == propertyName);
+            var exact = Columns.FirstOrDefault(c => c.PropertyName == propertyName);
             return exact;
         }
 
         [PublicAPI]
-        public IColumn FindColumn(string columnName)
+        public Column FindColumn(string columnName)
         {
             var exact = Columns.FirstOrDefault(c => c.Name == columnName);
             return exact;
         }
 
-        public interface IColumn
+        public class Column
         {
-            string Collation { get; }
-            Type ColumnType { get; }
-            object DefaultValue { get; }
-            IEnumerable<IndexedAttribute> Indices { get; set; }
-            bool IsAutoGuid { get; }
-            bool IsAutoInc { get; }
-            bool IsNullable { get; }
-            bool IsPK { get; }
-            int? MaxStringLength { get; }
-            string Name { get; }
-            string PropertyName { get; }
-
-            object GetValue(object obj);
-            void SetValue(object obj, [CanBeNull] object val);
-        }
-
-        public class AdHocColumn : IColumn
-        {
-            public readonly PropertyInfo Holder;
-            public AdHocColumn(String name, Type columnType, PropertyInfo holder, Object defaultValue = null)
+            public class TypeInfoPropAdapter : ITypeInfo
             {
-                if (!holder.PropertyType.GetTypeInfo().IsAssignableFrom(typeof(IDictionary<String, Object>).GetTypeInfo()))
-                    throw new ArgumentException("`holder` is expected to refer to a `IDictionary<String,Object>`");
+                readonly PropertyInfo o;
+                public TypeInfoPropAdapter(PropertyInfo prop)
+                {
+                    o = prop;
+                }
 
-                this.Holder = holder;
+                public Type DeclaringType { get { return o.DeclaringType; } }
 
-                ColumnType = columnType;
-                Name = name;
-
-                Collation = String.Empty;
-
-                IsPK = false;
-                IsAutoGuid = false;
-                IsAutoInc = false;
-
-                DefaultValue = defaultValue;
-
-                Indices = Enumerable.Empty<IndexedAttribute>();
-                IsNullable = true;
-                MaxStringLength = null;
+                public MethodInfo GetMethod { get { return o.GetMethod; } }
+                public string Name { get { return o.Name; } }
+                public Type Type { get { return o.PropertyType; } }
+                public IEnumerable<T> GetCustomAttributes<T>(bool inherit = false) where T : Attribute
+                {
+                    return o.GetCustomAttributes<T>();
+                }
+                public object GetValue(object instance)
+                {
+                    return o.GetValue(instance);
+                }
+                public void SetValue(object instance, object value)
+                {
+                    o.SetValue(instance, value);
+                }
             }
-
-            public string Collation { get; set; }
-            public Type ColumnType { get; set; }
-            public object DefaultValue { get; set; }
-            public IEnumerable<IndexedAttribute> Indices { get; set; }
-            public bool IsAutoGuid { get; set; }
-            public bool IsAutoInc { get; set; }
-            public bool IsNullable { get; set; }
-            public bool IsPK { get; set; }
-            public int? MaxStringLength { get; set; }
-            public string Name { get; set; }
-
-            public object GetValue(object obj)
-            {
-                var iholder = (IDictionary<string, object>)Holder.GetValue(obj);
-                if (!iholder.Keys.Contains(Name)) iholder[Name] = DefaultValue;
-                return iholder[Name];
-            }
-            public void SetValue(object obj, [CanBeNull] object val)
-            {
-                var iholder = (IDictionary<string, object>)Holder.GetValue(obj);
-                iholder[Name] = val;
-            }
-
-            // Should not be used.  This will break some sqlite.net features for these column types in the meantime.
-            public string PropertyName { get { throw new NotImplementedException(); } }
-        }
-
-        public class Column : IColumn
-        {
-            private readonly PropertyInfo _prop;
 
             [PublicAPI]
-            public Column(PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
+            public Column(PropertyInfo prop, CreateFlags createFlags = CreateFlags.None) 
+                : this(new TypeInfoPropAdapter(prop), createFlags)
             {
-                var colAttr =
-                    prop.GetCustomAttributes<ColumnAttribute>(true).FirstOrDefault();
 
-                _prop = prop;
-                Name = colAttr == null ? prop.Name : colAttr.Name;
+            }
+
+            readonly ITypeInfo creator;
+
+            [PublicAPI]
+            public Column(ITypeInfo creator, CreateFlags flags)
+            {
+                this.creator = creator;
+
+                var colAttr = creator
+                                .GetCustomAttributes<ColumnAttribute>(true)
+                                .FirstOrDefault();
+
+                Name = colAttr == null ? creator.Name : colAttr.Name;
                 //If this type is Nullable<T> then Nullable.GetUnderlyingType returns the T, otherwise it returns null, so get the actual type instead
-                ColumnType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-                Collation = Orm.Collation(prop);
+                ColumnType = Nullable.GetUnderlyingType(creator.Type) ?? creator.Type;
+                Collation = Orm.Collation(creator);
 
-                IsPK = Orm.IsPK(prop) ||
-                       (((createFlags & CreateFlags.ImplicitPK) == CreateFlags.ImplicitPK) &&
-                        string.Compare(prop.Name, Orm.ImplicitPkName, StringComparison.OrdinalIgnoreCase) == 0);
+                IsPK = Orm.IsPK(creator) ||
+                       (((flags & CreateFlags.ImplicitPK) == CreateFlags.ImplicitPK) &&
+                        string.Compare(creator.Name, Orm.ImplicitPkName, StringComparison.OrdinalIgnoreCase) == 0);
 
-                var isAuto = Orm.IsAutoInc(prop) ||
-                             (IsPK && ((createFlags & CreateFlags.AutoIncPK) == CreateFlags.AutoIncPK));
+                var isAuto = Orm.IsAutoInc(creator) ||
+                             (IsPK && ((flags & CreateFlags.AutoIncPK) == CreateFlags.AutoIncPK));
                 IsAutoGuid = isAuto && ColumnType == typeof (Guid);
                 IsAutoInc = isAuto && !IsAutoGuid;
 
-                DefaultValue = Orm.GetDefaultValue(prop);
+                DefaultValue = Orm.GetDefaultValue(creator);
 
-                Indices = Orm.GetIndices(prop);
+                Indices = Orm.GetIndices(creator);
                 if (!Indices.Any()
                     && !IsPK
-                    && ((createFlags & CreateFlags.ImplicitIndex) == CreateFlags.ImplicitIndex)
+                    && ((flags & CreateFlags.ImplicitIndex) == CreateFlags.ImplicitIndex)
                     && Name.EndsWith(Orm.ImplicitIndexSuffix, StringComparison.OrdinalIgnoreCase))
                 {
                     Indices = new[] {new IndexedAttribute()};
                 }
-                IsNullable = !(IsPK || Orm.IsMarkedNotNull(prop));
-                MaxStringLength = Orm.MaxStringLength(prop);
+                IsNullable = !(IsPK || Orm.IsMarkedNotNull(creator));
+                MaxStringLength = Orm.MaxStringLength(creator);
             }
 
             [PublicAPI]
@@ -278,7 +222,7 @@ namespace SQLite.Net
             [PublicAPI]
             public string PropertyName
             {
-                get { return _prop.Name; }
+                get { return creator.Name; }
             }
 
             [PublicAPI]
@@ -308,6 +252,8 @@ namespace SQLite.Net
             [PublicAPI]
             public object DefaultValue { get; private set; }
 
+            // use the overridable methods of propertyinfo
+
             /// <summary>
             ///     Set column value.
             /// </summary>
@@ -316,7 +262,7 @@ namespace SQLite.Net
             [PublicAPI]
             public void SetValue(object obj, [CanBeNull] object val)
             {
-                var propType = _prop.PropertyType;
+                var propType = creator.Type;
                 var typeInfo = propType.GetTypeInfo();
 
                 if (typeInfo.IsGenericType && propType.GetGenericTypeDefinition() == typeof (Nullable<>))
@@ -332,7 +278,7 @@ namespace SQLite.Net
                         }
                         else
                         {
-                            _prop.SetValue(obj, val, null);
+                            creator.SetValue(obj, val);
                         }
                     }
                 }
@@ -342,7 +288,7 @@ namespace SQLite.Net
                 }
                 else
                 {
-                    _prop.SetValue(obj, val, null);
+                    creator.SetValue(obj, val);
                 }
             }
 
@@ -352,14 +298,14 @@ namespace SQLite.Net
                 if (result != null)
                 {
                     result = Enum.ToObject(type, result);
-                    _prop.SetValue(obj, result, null);
+                    creator.SetValue(obj, result);
                 }
             }
 
             [PublicAPI]
             public object GetValue(object obj)
             {
-                return _prop.GetValue(obj, null);
+                return creator.GetValue(obj);
             }
         }
     }

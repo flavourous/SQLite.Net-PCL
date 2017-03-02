@@ -31,12 +31,30 @@ using NotNullAttribute = SQLite.Net.Attributes.NotNullAttribute;
 
 namespace SQLite.Net
 {
+    public static class ityextension
+    {
+        public static bool IsDefined<T>(this ITypeInfo @this, bool inherit=false)
+            where T : Attribute
+        {
+            return @this != null && @this.GetCustomAttributes<T>(inherit).Count() > 0;
+        }
+    }
+    public interface ITypeInfo
+    {
+        IEnumerable<T> GetCustomAttributes<T>(bool inherit = false) where T : Attribute;
+        String Name { get; }
+        Type Type { get; }
+        Type DeclaringType { get; }
+        Object GetValue(Object instance);
+        void SetValue(Object instance, Object value);
+        MethodInfo GetMethod { get; }
+    }
     internal static class Orm
     {
         public const string ImplicitPkName = "Id";
         public const string ImplicitIndexSuffix = "Id";
 
-        internal static string SqlDecl(TableMapping.IColumn p, bool storeDateTimeAsTicks, IBlobSerializer serializer,
+        internal static string SqlDecl(TableMapping.Column p, bool storeDateTimeAsTicks, IBlobSerializer serializer,
             IDictionary<Type, string> extraTypeMappings)
         {
             var decl = "\"" + p.Name + "\" " + SqlType(p, storeDateTimeAsTicks, serializer, extraTypeMappings) + " ";
@@ -65,7 +83,7 @@ namespace SQLite.Net
             return decl;
         }
 
-        private static string SqlType(TableMapping.IColumn p, bool storeDateTimeAsTicks,
+        private static string SqlType(TableMapping.Column p, bool storeDateTimeAsTicks,
             IBlobSerializer serializer,
             IDictionary<Type, string> extraTypeMappings)
         {
@@ -142,12 +160,12 @@ namespace SQLite.Net
             throw new NotSupportedException("Don't know about " + clrType);
         }
 
-        internal static bool IsPK(MemberInfo p)
+        internal static bool IsPK(ITypeInfo p)
         {
             return p.GetCustomAttributes<PrimaryKeyAttribute>().Any();
         }
 
-        internal static string Collation(MemberInfo p)
+        internal static string Collation(ITypeInfo p)
         {
             foreach (var attribute in p.GetCustomAttributes<CollationAttribute>())
             {
@@ -156,18 +174,18 @@ namespace SQLite.Net
             return string.Empty;
         }
 
-        internal static bool IsAutoInc(MemberInfo p)
+        internal static bool IsAutoInc(ITypeInfo p)
         {
             return p.GetCustomAttributes<AutoIncrementAttribute>().Any();
         }
 
-        internal static IEnumerable<IndexedAttribute> GetIndices(MemberInfo p)
+        internal static IEnumerable<IndexedAttribute> GetIndices(ITypeInfo p)
         {
             return p.GetCustomAttributes<IndexedAttribute>();
         }
 
         [CanBeNull]
-        internal static int? MaxStringLength(PropertyInfo p)
+        internal static int? MaxStringLength(ITypeInfo p)
         {
             foreach (var attribute in p.GetCustomAttributes<MaxLengthAttribute>())
             {
@@ -177,7 +195,7 @@ namespace SQLite.Net
         }
 
         [CanBeNull]
-        internal static object GetDefaultValue(PropertyInfo p)
+        internal static object GetDefaultValue(ITypeInfo p)
         {
             foreach (var attribute in p.GetCustomAttributes<DefaultAttribute>())
             {
@@ -185,7 +203,7 @@ namespace SQLite.Net
                 {
                     if (!attribute.UseProperty)
                     {
-                        return Convert.ChangeType(attribute.Value, p.PropertyType);
+                        return Convert.ChangeType(attribute.Value, p.Type);
                     }
 
                     var obj = Activator.CreateInstance(p.DeclaringType);
@@ -193,13 +211,13 @@ namespace SQLite.Net
                 }
                 catch (Exception exception)
                 {
-                    throw new Exception("Unable to convert " + attribute.Value + " to type " + p.PropertyType, exception);
+                    throw new Exception("Unable to convert " + attribute.Value + " to type " + p.Type, exception);
                 }
             }
             return null;
         }
 
-        internal static bool IsMarkedNotNull(MemberInfo p)
+        internal static bool IsMarkedNotNull(ITypeInfo p)
         {
             var attrs = p.GetCustomAttributes<NotNullAttribute>(true);
             return attrs.Any();

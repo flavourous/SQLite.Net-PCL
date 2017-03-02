@@ -123,7 +123,7 @@ namespace SQLite.Net
             var stmt = Prepare();
             try
             {
-                var cols = new TableMapping.IColumn[_sqlitePlatform.SQLiteApi.ColumnCount(stmt)];
+                var cols = new TableMapping.Column[_sqlitePlatform.SQLiteApi.ColumnCount(stmt)];
 
                 for (var i = 0; i < cols.Length; i++)
                 {
