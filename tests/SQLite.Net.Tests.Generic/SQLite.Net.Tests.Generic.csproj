@@ -46,12 +46,12 @@
       <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="PCLStorage">
-      <HintPath>C:\WORK\REPOS\SQLite.Net PCL\packages\PCLStorage.1.0.2\lib\net45\PCLStorage.dll</HintPath>
+    <Reference Include="PCLStorage, Version=1.0.2.0, Culture=neutral, PublicKeyToken=286fe515a2c35b64, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\PCLStorage.1.0.2\lib\net45\PCLStorage.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="PCLStorage.Abstractions">
-      <HintPath>C:\WORK\REPOS\SQLite.Net PCL\packages\PCLStorage.1.0.2\lib\net45\PCLStorage.Abstractions.dll</HintPath>
+    <Reference Include="PCLStorage.Abstractions, Version=1.0.2.0, Culture=neutral, PublicKeyToken=286fe515a2c35b64, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\PCLStorage.1.0.2\lib\net45\PCLStorage.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -107,9 +107,6 @@
     <Compile Include="..\TransactionTest.cs" />
     <Compile Include="..\UnicodeTest.cs" />
     <Compile Include="..\UniqueTest.cs" />
-    <Compile Include="..\AdHocColumnTest.cs">
-      <Link>AdHocColumnTest.cs</Link>
-    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -128,6 +125,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <Import Project="..\..\packages\System.Data.SQLite.Core.1.0.98.1\build\net45\System.Data.SQLite.Core.targets" Condition="Exists('..\..\packages\System.Data.SQLite.Core.1.0.98.1\build\net45\System.Data.SQLite.Core.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

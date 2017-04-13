@@ -108,6 +108,7 @@
     <Compile Include="SQLiteConnectionString.cs" />
     <Compile Include="SQLiteConnectionWithLock.cs" />
     <Compile Include="TableMapping.cs" />
+    <Compile Include="TableMappingUtil.cs" />
     <Compile Include="TableQuery.cs" />
     <Compile Include="Interop\SQLiteOpenFlags.cs" />
     <Compile Include="Attributes\TableAttribute.cs" />
